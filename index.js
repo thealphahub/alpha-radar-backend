@@ -17,43 +17,54 @@ function getGrade(score) {
 }
 
 async function getTransactions() {
-  const txs = await axios.post(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'getSignaturesForAddress',
-    params: [PUMP_FUN_PROGRAM, { limit: 20 }]
-  });
+  try {
+    const txs = await axios.post(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getSignaturesForAddress',
+      params: [PUMP_FUN_PROGRAM, { limit: 20 }]
+    });
 
-  return txs.data.result.map(tx => tx.signature);
+    return txs.data?.result?.map(tx => tx.signature) || [];
+  } catch (err) {
+    console.error("Erreur lors de la récupération des transactions :", err.message);
+    return [];
+  }
 }
 
 async function getTokenMetadataFromTx(signature) {
-  const txData = await axios.post(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
-    jsonrpc: '2.0',
-    id: 1,
-    method: 'getTransaction',
-    params: [signature, { maxSupportedTransactionVersion: 0 }]
-  });
+  try {
+    const txData = await axios.post(`https://mainnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getTransaction',
+      params: [signature, { maxSupportedTransactionVersion: 0 }]
+    });
 
-  const instructions = txData.data.result.transaction.message.instructions;
-  const first = instructions.find(i => i.programId === "token_metadata");
+    const instructions = txData.data?.result?.transaction?.message?.instructions || [];
 
-  if (!first || !first.parsed) return null;
+    const first = instructions.find(i =>
+      i?.parsed &&
+      typeof i.parsed.name === 'string' &&
+      typeof i.parsed.symbol === 'string'
+    );
 
-  const parsed = first.parsed;
-  const name = parsed.name;
-  const symbol = parsed.symbol;
-  const uri = parsed.uri;
-  const mint = parsed.info?.mint;
+    if (!first || !first.parsed) return null;
 
-  return {
-    mint,
-    name,
-    symbol,
-    uri,
-    juiceScore: Math.floor(Math.random() * 100),
-    grade: getGrade(Math.floor(Math.random() * 100))
-  };
+    const { name, symbol, uri, info } = first.parsed;
+
+    return {
+      mint: info?.mint || "unknown",
+      name,
+      symbol,
+      uri,
+      juiceScore: Math.floor(Math.random() * 100),
+      grade: getGrade(Math.floor(Math.random() * 100))
+    };
+  } catch (e) {
+    console.error(`Erreur lors de la lecture de ${signature}: ${e.message}`);
+    return null;
+  }
 }
 
 app.get('/v1/pump-gems', async (req, res) => {
@@ -68,13 +79,14 @@ app.get('/v1/pump-gems', async (req, res) => {
       }
     }
 
+    console.log(`✅ ${tokens.length} tokens détectés.`);
     res.json(tokens);
   } catch (err) {
-    console.error(err.message);
+    console.error("Erreur serveur générale :", err.message);
     res.status(500).send("Erreur serveur");
   }
 });
 
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`🚀 Server is running on port ${PORT}`);
 });
