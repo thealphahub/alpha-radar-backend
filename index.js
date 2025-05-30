@@ -83,9 +83,9 @@ app.get('/v1/pump-gems', async (req, res) => {
     const tokens = [];
 
     for (const sig of signatures) {
-      const metadata = await getTokenMetadataFromTx(sig);
-      if (metadata && metadata.juiceScore >= 60) {
-        tokens.push(metadata);
+  const metadata = await getTokenMetadataFromTx(sig);
+  if (metadata) {
+    tokens.push(metadata);
       }
     }
 
